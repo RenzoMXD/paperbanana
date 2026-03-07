@@ -60,9 +60,8 @@ class CriticAgent(BaseAgent):
         prompt_type = "diagram" if diagram_type == DiagramType.METHODOLOGY else "plot"
         template = self.load_prompt(prompt_type)
         prompt_label = self._prompt_label_from_image_path(image_path) or "critic"
-        prompt = self.format_prompt(
-            template,
-            prompt_label=prompt_label,
+        # Build prompt without going through format_prompt so we can record once after appending user_feedback
+        prompt = template.format(
             source_context=source_context,
             caption=caption,
             description=description,
@@ -72,6 +71,19 @@ class CriticAgent(BaseAgent):
             prompt += (
                 f"\n\nAdditional user feedback to consider in your evaluation:\n{user_feedback}"
             )
+
+        # Record the exact prompt sent to the model (including user_feedback in continue-run flows)
+        if self._prompt_recorder is not None:
+            try:
+                self._prompt_recorder.record(
+                    agent_name=self.agent_name,
+                    label=prompt_label,
+                    prompt=prompt,
+                )
+            except Exception:
+                logger.warning(
+                    "Prompt recording failed", agent=self.agent_name, label=prompt_label
+                )
 
         logger.info("Running critic agent", image_path=image_path)
 
